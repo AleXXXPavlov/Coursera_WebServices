@@ -31,8 +31,7 @@ def parse(path_to_file):
                 imgs += 1
 
     # Количество заголовков, первая буква текста внутри которых соответствует заглавной букве E, T или C.
-    header_tags = ['h1', 'h2', 'h3', 'h4', 'h5']
-    headers = len([h for h in soup.find_all(header_tags, text=re.compile("[ETC].*"))])
+    headers = len(re.findall(r"<h[1-5][^>]*.*?>[ETC].*?</h[1-5]>", html_text))
 
     # Длина максимальной последовательности ссылок, между которыми нет других тегов, открывающихся или закрывающихся.
     links = re.findall('<[a-zA-Z]+|</[a-zA-Z]+>', html_text)
@@ -120,4 +119,4 @@ def get_statistics(path, start_page, end_page):
 
 
 if __name__ == '__main__':
-    print(get_statistics("wiki", "Stone_Age", "Python_(programming_language)"))
+    print(parse("wiki/Stone_Age"))
