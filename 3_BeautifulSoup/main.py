@@ -1,14 +1,28 @@
-from bs4 import BeautifulSoup
 import unittest
 import re
+import os
+
+from bs4 import BeautifulSoup
+from bfs import *
 
 
 def parse(path_to_file):
+    """
+    Сбор статистики со странички из path_to_file, в виде списка из 4 элементов. где
+        1 - количество картинок (img) с шириной (width) не меньше 200,
+        2 - количество заголовков, первая буква текста внутри которых
+        соответствует заглавной букве E, T или C,
+        3 - длину максимальной последовательности ссылок, между которыми
+        нет других тегов, открывающихся или закрывающихся,
+        4 - количество невложенных списков <ol> и <ul>
+    """
+
+    # открытие странички - создание soup
     with open(path_to_file, mode="r", encoding="utf-8") as html_file:
         html_text = html_file.read()
     soup = BeautifulSoup(html_text, "lxml")
 
-    # # Количество картинок (img) с шириной (width) не меньше 200.
+    # Количество картинок (img) с шириной (width) не меньше 200.
     imgs = 0
     img_objs = soup.find_all('img')
     for img in img_objs:
@@ -18,9 +32,9 @@ def parse(path_to_file):
 
     # Количество заголовков, первая буква текста внутри которых соответствует заглавной букве E, T или C.
     header_tags = ['h1', 'h2', 'h3', 'h4', 'h5']
-    headers = len([h for h in soup.find_all(header_tags, text=re.compile(r"E.+|T.+|C.+"))])
+    headers = len([h for h in soup.find_all(header_tags, text=re.compile("[ETC].*"))])
 
-    # Длину максимальной последовательности ссылок, между которыми нет других тегов, открывающихся или закрывающихся.
+    # Длина максимальной последовательности ссылок, между которыми нет других тегов, открывающихся или закрывающихся.
     links = re.findall('<[a-zA-Z]+|</[a-zA-Z]+>', html_text)
     linkslen = 0
     i = 0
@@ -53,20 +67,57 @@ def parse(path_to_file):
     return [imgs, headers, linkslen, lists]
 
 
-class TestParse(unittest.TestCase):
-    def test_parse(self):
-        test_cases = (
-            ('wiki/Stone_Age', [13, 10, 12, 40]),
-            ('wiki/Brain', [19, 5, 25, 11]),
-            ('wiki/Artificial_intelligence', [8, 19, 13, 198]),
-            ('wiki/Python_(programming_language)', [2, 5, 17, 41]),
-            ('wiki/Spectrogram', [1, 2, 4, 7]))
+def get_page_links(path, page) -> list:
+    """
+    Возвращает список страниц, по которым есть переход в переданной странице,
+    а также только те, что сохранены в директории /wiki/.
+    """
 
-        for path, expected in test_cases:
-            with self.subTest(path=path, expected=expected):
-                self.assertEqual(parse(path), expected)
+    with open(os.path.join(path, page), mode="r", encoding="utf-8") as file:
+        links = re.findall(r"(?<=/wiki/)[\w()]+", file.read())
+
+    right_links = list()
+    for link in list(set(links)):
+        if os.path.isfile(os.path.join(path, link)):
+            right_links.append(link)
+
+    return right_links
+
+
+def build_bridge(path, start_page, end_page):
+    """
+    Возвращает список страниц, по которым можно перейти по ссылкам со start_page на
+    end_page, начальная и конечная страницы включаются в результирующий список.
+    """
+
+    graph_pages = dict()                            # граф, где вершина - страница википедии
+
+    all_pages = os.listdir(path)
+    for page in all_pages:
+        graph_pages[page] = get_page_links(path, page)
+
+    _, parents = bfs(graph_pages, start_page, end_page)
+    parents_path = get_parent_path(parents, start_page, end_page)
+
+    return parents_path
+
+
+def get_statistics(path, start_page, end_page):
+    """
+    Собирает статистику со страниц, возвращает словарь, где ключ - название страницы,
+    значение - список со статистикой страницы.
+    """
+
+    # получаем список страниц, с которых необходимо собрать статистику
+    pages = build_bridge(path, start_page, end_page)
+
+    # сбор статистики
+    statistics = dict()
+    for page in pages:
+        statistics[page] = parse(os.path.join(path, page))
+
+    return statistics
 
 
 if __name__ == '__main__':
-    # unittest.main()
-    parse('wiki/Python_(programming_language)')
+    print(get_statistics("wiki", "Stone_Age", "Python_(programming_language)"))
