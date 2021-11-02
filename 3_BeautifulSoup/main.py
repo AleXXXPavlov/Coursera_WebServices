@@ -1,69 +1,8 @@
-import unittest
 import re
 import os
 
-from bs4 import BeautifulSoup
 from bfs import *
-
-
-def parse(path_to_file):
-    """
-    Сбор статистики со странички из path_to_file, в виде списка из 4 элементов. где
-        1 - количество картинок (img) с шириной (width) не меньше 200,
-        2 - количество заголовков, первая буква текста внутри которых
-        соответствует заглавной букве E, T или C,
-        3 - длину максимальной последовательности ссылок, между которыми
-        нет других тегов, открывающихся или закрывающихся,
-        4 - количество невложенных списков <ol> и <ul>
-    """
-
-    # открытие странички - создание soup
-    with open(path_to_file, mode="r", encoding="utf-8") as html_file:
-        html_text = html_file.read()
-    soup = BeautifulSoup(html_text, "lxml")
-
-    # Количество картинок (img) с шириной (width) не меньше 200.
-    imgs = 0
-    img_objs = soup.find_all('img')
-    for img in img_objs:
-        if img.has_attr("width"):
-            if int(img["width"]) >= 200:
-                imgs += 1
-
-    # Количество заголовков, первая буква текста внутри которых соответствует заглавной букве E, T или C.
-    headers = len(re.findall(r"<h[1-5][^>]*.*?>[ETC].*?</h[1-5]>", html_text))
-
-    # Длина максимальной последовательности ссылок, между которыми нет других тегов, открывающихся или закрывающихся.
-    links = re.findall('<[a-zA-Z]+|</[a-zA-Z]+>', html_text)
-    linkslen = 0
-    i = 0
-    while i < len(links):
-        curr_a = 0
-        while links[i] == "<a":
-            while links[i] != "</a>":
-                i += 1
-            i += 1
-            curr_a += 1
-
-        linkslen = curr_a if curr_a > linkslen else linkslen
-        i += 1
-
-    # Количество невложенных списков <ol> и <ul>
-    lists = 0
-    i = 0
-    while i < len(links):
-        if links[i] in ["<ol", "<ul"]:
-            nested_lists = 1
-            while nested_lists != 0:
-                i += 1
-                if links[i] in ["<ol", "<ul"]:
-                    nested_lists += 1
-                elif links[i] in ["</ol>", "</ul>"]:
-                    nested_lists -= 1
-            lists += 1
-        i += 1
-
-    return [imgs, headers, linkslen, lists]
+from parse import parse
 
 
 def get_page_links(path, page) -> list:
@@ -118,5 +57,3 @@ def get_statistics(path, start_page, end_page):
     return statistics
 
 
-if __name__ == '__main__':
-    print(parse("wiki/Stone_Age"))
